@@ -1,0 +1,30 @@
+# Paykit field guide
+
+> How to take payments in a web service with Paykit (Pubky's payment protocol), a self-hosted paykit-server and Bitkit wallets. Verified against pubky/paykit-server, pubky/paykit-rs and synonymdev/bitkit-android on 2026-10-29. Paykit is pre-production: re-check against current sources.
+
+Key facts an agent usually gets wrong:
+- Your backend never touches funds. paykit-server sends payment requests from the seller's Bitkit (Creator) to the buyer's Bitkit (Reader); the buyer approves in Bitkit.
+- Every business call to paykit-server is signed with an Ed25519 key whose public key is listed in `signed_services.trusted_public_keys`. The key is read at startup only: restart after changing it.
+- The signature covers `"paykit-http-signature-v1\0" + METHOD + "\0" + path + "\0" + raw body`, header `x-paykit-signature`, base64url without padding. The body must be canonical JSON (RFC 8785, sorted keys) or the server answers invalid_request.
+- Amounts are base-unit integer strings: USDT in millionths (1 USDT = "1000000"), BTC in sats.
+- Bitkit pays USDT on Arbitrum through an ERC-4337 smart account: fees are paid in USDT, the buyer needs no ETH.
+- Bitkit allowances (automatic recurring payments) only cover BTC over Lightning; USDT requests are always approved by hand.
+- To prove which Pubky key a buyer's Bitkit holds, use `GrantAuthFlow` (`pubkyauth://signin_grant`) with at least one capability. An empty capability list makes Bitkit fail with "unknown error". Pubky Ring's plain `signin` flow is not handled by Bitkit.
+
+## Docs
+
+- [Architecture](https://github.com/PastaGringo/paykit-guide/blob/main/docs/01-architecture.md): roles, data flow, what each party stores.
+- [Running paykit-server](https://github.com/PastaGringo/paykit-guide/blob/main/docs/02-paykit-server.md): config.toml, Docker/Dokploy deployment, version pinning, backups, the file-mount pitfall.
+- [Signed requests](https://github.com/PastaGringo/paykit-guide/blob/main/docs/03-signed-requests.md): generating the signing key, signature scheme, canonical JSON, TypeScript client.
+- [Seller (Creator) setup](https://github.com/PastaGringo/paykit-guide/blob/main/docs/04-creator-setup.md): the /setup iframe, allowed origins, /setup/status.
+- [Payment requests](https://github.com/PastaGringo/paykit-guide/blob/main/docs/05-payment-requests.md): prepare, activate, status polling, recording a payment once.
+- [Linking a buyer's Bitkit](https://github.com/PastaGringo/paykit-guide/blob/main/docs/06-linking-a-buyer-bitkit.md): GrantAuthFlow with Bitkit, capability rules.
+- [Bitkit facts](https://github.com/PastaGringo/paykit-guide/blob/main/docs/07-bitkit-facts.md): USDT fees, allowances, error messages.
+- [Checklist and pitfalls](https://github.com/PastaGringo/paykit-guide/blob/main/docs/08-checklist.md)
+
+## Sources
+
+- [paykit-server](https://github.com/pubky/paykit-server): README describes every route and status field.
+- [paykit-rs](https://github.com/pubky/paykit-rs): protocol specs under specs/ (allowances, payment requests, ERC-20 proofs).
+- [bitkit-android](https://github.com/synonymdev/bitkit-android): wallet behaviour.
+- [Pubky JS SDK](https://www.npmjs.com/package/@synonymdev/pubky): AuthFlow, GrantAuthFlow, Keypair.
